@@ -1,6 +1,6 @@
-flask>=2.0.0
-paddlepaddle
-paddleocr>=2.6.0
-pymupdf
-Pillow
-werkzeug
+Flask==3.1.2
+paddlepaddle==3.2.2
+paddleocr==3.3.2
+PyMuPDF==1.26.7
+Pillow==12.1.0
+Werkzeug==3.1.4
