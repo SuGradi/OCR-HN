@@ -37,3 +37,26 @@ class Config:
 # Ensure directories exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
+
+# ==================== 第三方 OCR API 配置 ====================
+
+# OCR.space API 配置
+OCRSPACE_CONFIG = {
+    'api_key': os.environ.get('OCRSPACE_API_KEY') or 'K87544821288957',
+    'endpoint': 'https://api.ocr.space/parse/image',
+    'language': 'chs',  # 简体中文
+    'engine': '2',      # OCR Engine 2
+}
+
+# 可用的 OCR 服务列表
+OCR_SERVICES = {
+    'local': {
+        'name': '本地识别 (PaddleOCR)',
+        'description': '使用本地 PaddleOCR 引擎，无需网络'
+    },
+    'ocrspace': {
+        'name': 'OCR.space (在线)',
+        'description': '使用 OCR.space 在线 API'
+    }
+}
+

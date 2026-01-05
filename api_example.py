@@ -3,6 +3,7 @@ OCR API 调用示例
 ================
 
 演示如何通过 API 调用 OCR 服务进行文字识别
+支持选择本地 PaddleOCR 或 OCR.space 在线服务
 """
 import requests
 import json
@@ -13,13 +14,20 @@ import os
 # API 服务地址
 API_URL = "http://localhost:5000/api/ocr"
 
+# OCR 服务类型
+OCR_SERVICE_LOCAL = '1'      # 本地 PaddleOCR
+OCR_SERVICE_OCRSPACE = '2'   # OCR.space 在线
 
-def ocr_file(file_path: str, save_result: bool = False) -> dict:
+
+def ocr_file(file_path: str, ocr_service: str = OCR_SERVICE_LOCAL, save_result: bool = False) -> dict:
     """
     调用 OCR API 识别文件中的文字
     
     参数:
         file_path: 文件路径 (支持 JPG, PNG, JPEG, PDF)
+        ocr_service: OCR 服务类型
+            - '1': 本地识别 (PaddleOCR)
+            - '2': OCR.space (在线)
         save_result: 是否在服务器保存结果文件
     
     返回:
@@ -30,7 +38,10 @@ def ocr_file(file_path: str, save_result: bool = False) -> dict:
     
     with open(file_path, 'rb') as f:
         files = {'file': f}
-        data = {'save_result': 'true' if save_result else 'false'}
+        data = {
+            'ocr_service': ocr_service,
+            'save_result': 'true' if save_result else 'false'
+        }
         
         response = requests.post(API_URL, files=files, data=data)
         response.raise_for_status()
@@ -43,27 +54,38 @@ def main():
     
     # 检查命令行参数
     if len(sys.argv) < 2:
-        print("用法: python api_example.py <文件路径>")
-        print("示例: python api_example.py invoice.pdf")
-        print("      python api_example.py image.jpg")
+        print("用法: python api_example.py <文件路径> [服务类型]")
+        print("")
+        print("服务类型:")
+        print("  1 - 本地识别 (PaddleOCR) [默认]")
+        print("  2 - OCR.space (在线)")
+        print("")
+        print("示例:")
+        print("  python api_example.py invoice.pdf      # 使用本地识别")
+        print("  python api_example.py invoice.pdf 2    # 使用 OCR.space")
         sys.exit(1)
     
     file_path = sys.argv[1]
+    ocr_service = sys.argv[2] if len(sys.argv) > 2 else OCR_SERVICE_LOCAL
     
+    service_name = "OCR.space" if ocr_service == '2' else "本地 PaddleOCR"
     print(f"正在识别文件: {file_path}")
+    print(f"使用服务: {service_name}")
     print("-" * 50)
     
     try:
-        result = ocr_file(file_path, save_result=False)
+        result = ocr_file(file_path, ocr_service=ocr_service, save_result=False)
         
         if result.get('success'):
             data = result['data']
             
+            # 显示使用的服务
+            print(f"🔧 OCR 服务: {data.get('ocr_service', service_name)}")
+            
             # 显示发票金额 (如果有)
             amount = data.get('invoice_amount', '0')
             if amount != '0':
-                print(f"📄 发票金额: ￥{amount}")
-                print("-" * 50)
+                print(f"💰 发票金额: ￥{amount}")
             
             # 显示识别统计
             print(f"✅ 识别成功！共 {data['line_count']} 行")
@@ -91,9 +113,15 @@ def main():
 
 # ============ 更多使用示例 ============
 
-def example_basic():
-    """基本调用示例"""
-    result = ocr_file("invoice.pdf")
+def example_local_ocr():
+    """使用本地 PaddleOCR 识别"""
+    result = ocr_file("invoice.pdf", ocr_service=OCR_SERVICE_LOCAL)
+    print(result['data']['text'])
+
+
+def example_ocrspace():
+    """使用 OCR.space 在线识别"""
+    result = ocr_file("invoice.pdf", ocr_service=OCR_SERVICE_OCRSPACE)
     print(result['data']['text'])
 
 
@@ -112,15 +140,20 @@ def example_get_lines():
 
 
 def example_batch_process():
-    """批量处理示例"""
+    """批量处理示例 - 对比两种服务"""
     import glob
     
     pdf_files = glob.glob("*.pdf")
     for pdf in pdf_files:
-        result = ocr_file(pdf)
-        if result.get('success'):
-            amount = result['data']['invoice_amount']
-            print(f"{pdf}: ￥{amount}")
+        # 使用本地识别
+        result1 = ocr_file(pdf, ocr_service=OCR_SERVICE_LOCAL)
+        # 使用 OCR.space
+        result2 = ocr_file(pdf, ocr_service=OCR_SERVICE_OCRSPACE)
+        
+        if result1.get('success') and result2.get('success'):
+            amount1 = result1['data']['invoice_amount']
+            amount2 = result2['data']['invoice_amount']
+            print(f"{pdf}: 本地=￥{amount1}, OCR.space=￥{amount2}")
 
 
 if __name__ == "__main__":

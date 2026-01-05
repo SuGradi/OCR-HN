@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR API 调用示例</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2rem;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .card h2 {
+            font-size: 1.1rem;
+            color: #6366f1;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        input[type="file"],
+        select {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            color: #f8fafc;
+            font-size: 1rem;
+        }
+
+        select {
+            cursor: pointer;
+        }
+
+        select option {
+            background: #1a1a2e;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .result-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .result-stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #10b981;
+        }
+
+        .stat-value.amount {
+            color: #f59e0b;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #f8fafc;
+            font-family: monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+
+        .loading {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+            color: #94a3b8;
+        }
+
+        .loading.show {
+            display: flex;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .code-example {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .code-example .comment {
+            color: #6a737d;
+        }
+
+        .code-example .keyword {
+            color: #ff7b72;
+        }
+
+        .code-example .string {
+            color: #a5d6ff;
+        }
+
+        .code-example .function {
+            color: #d2a8ff;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: #6366f1;
+            color: #6366f1;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>📄 OCR API 调用示例</h1>
+        <p class="subtitle">演示如何通过前端调用 OCR API 接口</p>
+
+        <!-- 在线测试 -->
+        <div class="card">
+            <h2>🧪 在线测试</h2>
+
+            <div class="form-group">
+                <label>选择文件</label>
+                <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.pdf">
+            </div>
+
+            <div class="form-group">
+                <label>OCR 服务</label>
+                <select id="ocrService">
+                    <option value="1">1 - 本地识别 (PaddleOCR)</option>
+                    <option value="2">2 - OCR.space (在线)</option>
+                </select>
+            </div>
+
+            <button class="btn btn-primary" id="submitBtn" disabled>
+                开始识别
+            </button>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <span>正在识别中...</span>
+            </div>
+
+            <div class="error" id="error"></div>
+
+            <div class="result-box" id="resultBox" style="display: none;">
+                <div class="result-header">
+                    <div class="result-stats">
+                        <div class="stat">
+                            <span class="stat-label">识别行数</span>
+                            <span class="stat-value" id="lineCount">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">发票金额</span>
+                            <span class="stat-value amount" id="invoiceAmount">￥0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">OCR 服务</span>
+                            <span class="stat-value" id="usedService" style="color: #6366f1;">-</span>
+                        </div>
+                    </div>
+                </div>
+                <textarea id="resultText" readonly></textarea>
+            </div>
+        </div>
+
+        <!-- 代码示例 -->
+        <div class="card">
+            <h2>💻 代码示例</h2>
+
+            <div class="tabs">
+                <div class="tab active" data-tab="js">JavaScript</div>
+                <div class="tab" data-tab="python">Python</div>
+                <div class="tab" data-tab="curl">cURL</div>
+            </div>
+
+            <div class="tab-content active" id="tab-js">
+                <pre
+                    class="code-example"><code><span class="comment">// JavaScript Fetch API</span>
+<span class="keyword">const</span> formData = <span class="keyword">new</span> <span class="function">FormData</span>();
+formData.<span class="function">append</span>(<span class="string">'file'</span>, fileInput.files[0]);
+formData.<span class="function">append</span>(<span class="string">'ocr_service'</span>, <span class="string">'1'</span>);  <span class="comment">// 1=本地, 2=OCR.space</span>
+
+<span class="keyword">const</span> response = <span class="keyword">await</span> <span class="function">fetch</span>(<span class="string">'/api/ocr'</span>, {
+    method: <span class="string">'POST'</span>,
+    body: formData
+});
+
+<span class="keyword">const</span> result = <span class="keyword">await</span> response.<span class="function">json</span>();
+console.<span class="function">log</span>(result.data.text);           <span class="comment">// 识别文本</span>
+console.<span class="function">log</span>(result.data.invoice_amount);  <span class="comment">// 发票金额</span></code></pre>
+            </div>
+
+            <div class="tab-content" id="tab-python">
+                <pre
+                    class="code-example"><code><span class="comment"># Python requests 库</span>
+<span class="keyword">import</span> requests
+
+response = requests.<span class="function">post</span>(
+    <span class="string">'http://localhost:5000/api/ocr'</span>,
+    files={<span class="string">'file'</span>: <span class="function">open</span>(<span class="string">'invoice.pdf'</span>, <span class="string">'rb'</span>)},
+    data={<span class="string">'ocr_service'</span>: <span class="string">'2'</span|}  <span class="comment"># 使用 OCR.space</span>
+)
+
+result = response.<span class="function">json</span>()
+<span class="keyword">print</span>(result[<span class="string">'data'</span>][<span class="string">'text'</span>])
+<span class="keyword">print</span>(result[<span class="string">'data'</span>][<span class="string">'invoice_amount'</span>])</code></pre>
+            </div>
+
+            <div class="tab-content" id="tab-curl">
+                <pre class="code-example"><code><span class="comment"># cURL 命令行 - 使用本地识别</span>
+curl -X POST \
+  -F <span class="string">"file=@invoice.pdf"</span> \
+  -F <span class="string">"ocr_service=1"</span> \
+  http://localhost:5000/api/ocr
+
+<span class="comment"># 使用 OCR.space 在线识别</span>
+curl -X POST \
+  -F <span class="string">"file=@invoice.pdf"</span> \
+  -F <span class="string">"ocr_service=2"</span> \
+  http://localhost:5000/api/ocr</code></pre>
+            </div>
+        </div>
+
+        <!-- API 参数说明 -->
+        <div class="card">
+            <h2>📖 API 参数</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <th style="text-align: left; padding: 10px; color: #94a3b8;">参数</th>
+                    <th style="text-align: left; padding: 10px; color: #94a3b8;">类型</th>
+                    <th style="text-align: left; padding: 10px; color: #94a3b8;">说明</th>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 10px;"><code>file</code></td>
+                    <td style="padding: 10px; color: #10b981;">必需</td>
+                    <td style="padding: 10px;">上传的文件 (JPG/PNG/PDF)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 10px;"><code>ocr_service</code></td>
+                    <td style="padding: 10px; color: #f59e0b;">可选</td>
+                    <td style="padding: 10px;">1=本地PaddleOCR (默认), 2=OCR.space</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px;"><code>save_result</code></td>
+                    <td style="padding: 10px; color: #f59e0b;">可选</td>
+                    <td style="padding: 10px;">true/false, 是否保存结果文件</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const ocrService = document.getElementById('ocrService');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const resultBox = document.getElementById('resultBox');
+
+        // 文件选择后启用按钮
+        fileInput.addEventListener('change', () => {
+            submitBtn.disabled = !fileInput.files.length;
+        });
+
+        // Tab 切换
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // 提交识别
+        submitBtn.addEventListener('click', async () => {
+            if (!fileInput.files.length) return;
+
+            // 显示加载状态
+            submitBtn.disabled = true;
+            loading.classList.add('show');
+            error.classList.remove('show');
+            resultBox.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                formData.append('ocr_service', ocrService.value);
+
+                const response = await fetch('/api/ocr', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const data = result.data;
+                    document.getElementById('lineCount').textContent = data.line_count;
+                    document.getElementById('invoiceAmount').textContent = '￥' + data.invoice_amount;
+                    document.getElementById('usedService').textContent = data.ocr_service;
+                    document.getElementById('resultText').value = data.text;
+                    resultBox.style.display = 'block';
+                } else {
+                    error.textContent = '❌ ' + result.error;
+                    error.classList.add('show');
+                }
+            } catch (e) {
+                error.textContent = '❌ 请求失败: ' + e.message;
+                error.classList.add('show');
+            } finally {
+                loading.classList.remove('show');
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

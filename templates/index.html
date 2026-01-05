@@ -74,14 +74,23 @@
                     <p class="progress-text" id="progressText">正在识别中...</p>
                 </div>
 
-                <!-- Upload Button -->
-                <button class="btn-primary" id="uploadBtn" disabled>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="M21 21l-4.35-4.35"></path>
-                    </svg>
-                    开始识别
-                </button>
+                <!-- OCR Service Selector & Upload Button -->
+                <div class="action-row">
+                    <div class="ocr-service-selector">
+                        <label for="ocrService">OCR 服务:</label>
+                        <select id="ocrService" class="service-select">
+                            <!-- <option value="local">本地识别 (PaddleOCR)</option> -->
+                            <option value="ocrspace">OCR.space (在线)</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary" id="uploadBtn" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="M21 21l-4.35-4.35"></path>
+                        </svg>
+                        开始识别
+                    </button>
+                </div>
             </section>
 
             <!-- Result Section -->

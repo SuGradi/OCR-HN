@@ -168,8 +168,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const formData = new FormData();
         formData.append('file', selectedFile);
 
+        // 添加 OCR 服务选择
+        const ocrService = document.getElementById('ocrService').value;
+        formData.append('ocr_service', ocrService);
+
         try {
-            progressText.textContent = '正在上传文件...';
+            const serviceName = ocrService === 'ocrspace' ? 'OCR.space' : '本地 PaddleOCR';
+            progressText.textContent = `正在使用 ${serviceName} 识别...`;
 
             const response = await fetch('/upload', {
                 method: 'POST',

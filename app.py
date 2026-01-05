@@ -6,6 +6,8 @@ import os
 import re
 import uuid
 import logging
+import requests
+import base64
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
@@ -20,7 +22,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import configuration
-from config import Config, ALLOWED_EXTENSIONS, OCR_CONFIG, UPLOAD_FOLDER, RESULT_FOLDER
+from config import (Config, ALLOWED_EXTENSIONS, OCR_CONFIG, UPLOAD_FOLDER, 
+                    RESULT_FOLDER, OCRSPACE_CONFIG)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -139,6 +142,88 @@ def process_pdf(pdf_path):
             pdf_document.close()
 
 
+# ==================== 第三方 OCR API 处理 ====================
+
+def process_ocrspace(file_path):
+    """
+    使用 OCR.space API 处理图片/PDF
+    
+    参数:
+        file_path: 文件路径
+    返回:
+        识别文本列表
+    """
+    try:
+        api_key = OCRSPACE_CONFIG['api_key']
+        endpoint = OCRSPACE_CONFIG['endpoint']
+        
+        # 读取文件
+        with open(file_path, 'rb') as f:
+            file_data = f.read()
+        
+        # 获取文件扩展名
+        ext = get_file_extension(file_path)
+        filename = os.path.basename(file_path)
+        
+        # 准备请求
+        payload = {
+            'apikey': api_key,
+            'language': OCRSPACE_CONFIG['language'],
+            'OCREngine': OCRSPACE_CONFIG['engine'],
+            'isOverlayRequired': 'false',
+        }
+        
+        files = {
+            'file': (filename, file_data)
+        }
+        
+        logger.info(f"Calling OCR.space API for: {filename}")
+        
+        # 发送请求
+        response = requests.post(
+            endpoint,
+            files=files,
+            data=payload,
+            timeout=60
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        
+        # 检查错误
+        if result.get('IsErroredOnProcessing'):
+            error_msg = result.get('ErrorMessage', ['Unknown error'])
+            raise Exception(f"OCR.space API error: {error_msg}")
+        
+        # 提取文本
+        texts = []
+        parsed_results = result.get('ParsedResults', [])
+        
+        for i, page_result in enumerate(parsed_results):
+            if page_result.get('FileParseExitCode') == 1:
+                parsed_text = page_result.get('ParsedText', '')
+                if parsed_text:
+                    # 按行分割
+                    lines = [line.strip() for line in parsed_text.split('\n') if line.strip()]
+                    if len(parsed_results) > 1:
+                        texts.append(f"--- 第 {i + 1} 页 ---")
+                    texts.extend(lines)
+            else:
+                error_msg = page_result.get('ErrorMessage', 'Unknown error')
+                logger.warning(f"Page {i + 1} OCR failed: {error_msg}")
+        
+        logger.info(f"OCR.space extracted {len(texts)} lines")
+        return texts
+        
+    except requests.exceptions.Timeout:
+        raise Exception("OCR.space API 请求超时，请稍后重试")
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"OCR.space API 网络错误: {str(e)}")
+    except Exception as e:
+        logger.error(f"OCR.space error: {str(e)}")
+        raise
+
+
 def extract_invoice_amount(texts):
     """
     从识别结果中提取发票金额 (价税合计)
@@ -172,6 +257,12 @@ def save_result(texts, filename):
 def index():
     """Render main page"""
     return render_template('index.html')
+
+
+@app.route('/api-demo')
+def api_demo():
+    """API 调用示例页面"""
+    return render_template('api_demo.html')
 
 
 @app.route('/upload', methods=['POST'])
@@ -208,13 +299,22 @@ def upload_file():
         logger.info(f"File uploaded: {original_filename}")
         
         try:
-            # Process based on file type
+            # 获取 OCR 服务选择 (默认使用本地)
+            ocr_service = request.form.get('ocr_service', 'local')
             extension = get_file_extension(original_filename)
             
-            if extension == 'pdf':
-                texts = process_pdf(file_path)
+            logger.info(f"Using OCR service: {ocr_service}")
+            
+            # 根据选择的服务进行处理
+            if ocr_service == 'ocrspace':
+                # 使用 OCR.space API
+                texts = process_ocrspace(file_path)
             else:
-                texts = process_image(file_path)
+                # 使用本地 PaddleOCR
+                if extension == 'pdf':
+                    texts = process_pdf(file_path)
+                else:
+                    texts = process_image(file_path)
             
             if not texts:
                 return jsonify({
@@ -288,6 +388,9 @@ def api_ocr():
     
     参数:
         file: 文件 (必需) - 支持 JPG, PNG, JPEG, PDF
+        ocr_service: OCR 服务 (可选, 默认 1)
+            - 1: 本地识别 (PaddleOCR)
+            - 2: OCR.space (在线)
         save_result: 是否保存结果文件 (可选, 默认 false)
     
     返回 JSON:
@@ -298,17 +401,20 @@ def api_ocr():
             "lines": ["第1行", "第2行", ...],
             "line_count": 行数,
             "invoice_amount": "发票金额 (如有)",
+            "ocr_service": "使用的 OCR 服务",
             "download_file": "结果文件名 (如果 save_result=true)"
         },
         "error": "错误信息 (如果失败)"
     }
     
     示例调用 (curl):
-    curl -X POST -F "file=@invoice.pdf" http://localhost:5000/api/ocr
+    curl -X POST -F "file=@invoice.pdf" -F "ocr_service=1" http://localhost:5000/api/ocr
     
     示例调用 (Python requests):
     import requests
-    response = requests.post('http://localhost:5000/api/ocr', files={'file': open('invoice.pdf', 'rb')})
+    response = requests.post('http://localhost:5000/api/ocr', 
+                             files={'file': open('invoice.pdf', 'rb')},
+                             data={'ocr_service': '2'})  # 使用 OCR.space
     result = response.json()
     """
     try:
@@ -333,6 +439,15 @@ def api_ocr():
                 'error': f'不支持的文件格式。支持: {", ".join(ALLOWED_EXTENSIONS)}'
             }), 400
         
+        # 获取 OCR 服务选择 (1=本地, 2=OCR.space)
+        ocr_service_param = request.form.get('ocr_service', '1')
+        if ocr_service_param == '2':
+            ocr_service = 'ocrspace'
+            ocr_service_name = 'OCR.space'
+        else:
+            ocr_service = 'local'
+            ocr_service_name = '本地 PaddleOCR'
+        
         # 是否保存结果
         save_result_file = request.form.get('save_result', 'false').lower() == 'true'
         
@@ -342,16 +457,21 @@ def api_ocr():
         file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
         file.save(file_path)
         
-        logger.info(f"API OCR request: {original_filename}")
+        logger.info(f"API OCR request: {original_filename}, service: {ocr_service_name}")
         
         try:
-            # 识别处理
+            # 根据选择的服务进行处理
             extension = get_file_extension(original_filename)
             
-            if extension == 'pdf':
-                texts = process_pdf(file_path)
+            if ocr_service == 'ocrspace':
+                # 使用 OCR.space API
+                texts = process_ocrspace(file_path)
             else:
-                texts = process_image(file_path)
+                # 使用本地 PaddleOCR
+                if extension == 'pdf':
+                    texts = process_pdf(file_path)
+                else:
+                    texts = process_image(file_path)
             
             # 提取发票金额
             invoice_amount = extract_invoice_amount(texts) if texts else "0"
@@ -361,7 +481,8 @@ def api_ocr():
                 'text': '\n'.join(texts) if texts else '',
                 'lines': texts if texts else [],
                 'line_count': len(texts) if texts else 0,
-                'invoice_amount': invoice_amount
+                'invoice_amount': invoice_amount,
+                'ocr_service': ocr_service_name
             }
             
             # 可选保存结果文件
