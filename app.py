@@ -227,17 +227,64 @@ def process_ocrspace(file_path):
 def extract_invoice_amount(texts):
     """
     从识别结果中提取发票金额 (价税合计)
-    匹配格式: (小写)￥xxx.xx 或 (小写）￥xxx.xx
+    支持多种格式:
+    1. (小写)￥xxx.xx 或 (小写）￥xxx.xx
+    2. 小写 xxx.xx (同一行)
+    3. 小写 后下一行是金额
+    4. 独立的大金额行 (>10000)
     返回: 金额字符串，未找到返回 "0"
     """
-    # 匹配 (小写) 或 (小写） 后面的金额
-    pattern = r'[（\(]小写[）\)]\s*[￥¥]?\s*([\d,]+\.?\d*)'
+    candidates = []
     
-    for text in texts:
-        match = re.search(pattern, text)
+    for i, text in enumerate(texts):
+        # 模式1: (小写)￥xxx.xx 或 (小写）￥xxx.xx
+        match = re.search(r'[（\(]小写[）\)]\s*[￥¥]?\s*([\d,]+\.?\d*)', text)
         if match:
-            amount = match.group(1).replace(',', '')  # 移除千分位逗号
-            return amount
+            amount = match.group(1).replace(',', '')
+            try:
+                if float(amount) >= 100:
+                    candidates.append((1, float(amount), amount))
+            except ValueError:
+                pass
+        
+        # 模式2: 小写 xxx.xx (同一行，不带括号)
+        match = re.search(r'小写\s+(\d[\d,]*\.?\d*)', text)
+        if match:
+            amount = match.group(1).replace(',', '')
+            try:
+                if float(amount) >= 100:
+                    candidates.append((2, float(amount), amount))
+            except ValueError:
+                pass
+        
+        # 模式3: 如果当前行是"小写"，检查下一行是否是金额
+        if text.strip() in ['小写', '(小写)', '（小写）']:
+            if i + 1 < len(texts):
+                next_line = texts[i + 1].strip()
+                # 下一行是纯金额数字
+                match = re.match(r'^(\d[\d,]*\.\d{2})$', next_line)
+                if match:
+                    amount = match.group(1).replace(',', '')
+                    try:
+                        if float(amount) >= 100:
+                            candidates.append((3, float(amount), amount))
+                    except ValueError:
+                        pass
+        
+        # 模式4: 独立的大金额行 (通常 > 10000)
+        match = re.match(r'^(\d{5,}\.?\d*)$', text.strip())
+        if match:
+            amount = match.group(1)
+            try:
+                if float(amount) >= 10000:
+                    candidates.append((4, float(amount), amount))
+            except ValueError:
+                pass
+    
+    if candidates:
+        # 按优先级排序，同优先级取最大金额
+        candidates.sort(key=lambda x: (x[0], -x[1]))
+        return candidates[0][2]
     
     return "0"
 
