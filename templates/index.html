@@ -42,7 +42,7 @@
                             </svg>
                         </div>
                         <p class="upload-text">拖拽文件到这里，或 <span class="upload-link">点击选择文件</span></p>
-                        <p class="upload-hint">支持 JPG、PNG、JPEG、PDF 格式，最大 16MB</p>
+                        <p class="upload-hint">支持 JPG、PNG、JPEG、PDF 格式，最大 1MB</p>
                     </div>
                 </div>
 
@@ -77,10 +77,10 @@
                 <!-- OCR Service Selector & Upload Button -->
                 <div class="action-row">
                     <div class="ocr-service-selector">
-                        <label for="ocrService">OCR 服务:</label>
+                        <label for="ocrService">第三方 OCR 服务:</label>
                         <select id="ocrService" class="service-select">
                             <!-- <option value="local">本地识别 (PaddleOCR)</option> -->
-                            <option value="ocrspace">OCR.space (在线)</option>
+                            <option value="ocrspace">OCR.space</option>
                         </select>
                     </div>
                     <button class="btn-primary" id="uploadBtn" disabled>
@@ -136,6 +136,10 @@
                 <span id="errorText"></span>
             </div>
         </main>
+
+        <footer class="footer">
+            <p>© 2026 海纳百川. All rights reserved.</p>
+        </footer>
     </div>
 
     <!-- Toast Notification -->
