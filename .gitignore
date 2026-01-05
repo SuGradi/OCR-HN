@@ -46,3 +46,6 @@ Thumbs.db
 
 # PaddleOCR models cache (large files)
 # Models are downloaded automatically on first run
+gunicorn_conf.py
+gunicorn.pid
+uwsgi.ini
