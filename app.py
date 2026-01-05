@@ -231,10 +231,13 @@ def extract_invoice_amount(texts):
     1. (小写)￥xxx.xx 或 (小写）￥xxx.xx
     2. 小写 xxx.xx (同一行)
     3. 小写 后下一行是金额
-    4. 独立的大金额行 (>10000)
+    4. 独立的大金额行 (>10000，备用)
+    
+    注意: 多个"小写"匹配时优先选择位置最靠后的 (通常是价税合计)
     返回: 金额字符串，未找到返回 "0"
     """
-    candidates = []
+    xiaoxie_candidates = []  # 小写相关的匹配 (行号, 金额值, 金额字符串)
+    other_candidates = []    # 其他匹配 (备用)
     
     for i, text in enumerate(texts):
         # 模式1: (小写)￥xxx.xx 或 (小写）￥xxx.xx
@@ -243,7 +246,7 @@ def extract_invoice_amount(texts):
             amount = match.group(1).replace(',', '')
             try:
                 if float(amount) >= 100:
-                    candidates.append((1, float(amount), amount))
+                    xiaoxie_candidates.append((i, float(amount), amount))
             except ValueError:
                 pass
         
@@ -253,7 +256,7 @@ def extract_invoice_amount(texts):
             amount = match.group(1).replace(',', '')
             try:
                 if float(amount) >= 100:
-                    candidates.append((2, float(amount), amount))
+                    xiaoxie_candidates.append((i, float(amount), amount))
             except ValueError:
                 pass
         
@@ -267,24 +270,29 @@ def extract_invoice_amount(texts):
                     amount = match.group(1).replace(',', '')
                     try:
                         if float(amount) >= 100:
-                            candidates.append((3, float(amount), amount))
+                            xiaoxie_candidates.append((i, float(amount), amount))
                     except ValueError:
                         pass
         
-        # 模式4: 独立的大金额行 (通常 > 10000)
+        # 模式4: 独立的大金额行 (通常 > 10000) - 备用
         match = re.match(r'^(\d{5,}\.?\d*)$', text.strip())
         if match:
             amount = match.group(1)
             try:
                 if float(amount) >= 10000:
-                    candidates.append((4, float(amount), amount))
+                    other_candidates.append((i, float(amount), amount))
             except ValueError:
                 pass
     
-    if candidates:
-        # 按优先级排序，同优先级取最大金额
-        candidates.sort(key=lambda x: (x[0], -x[1]))
-        return candidates[0][2]
+    # 优先选择"小写"相关匹配中位置最靠后的
+    if xiaoxie_candidates:
+        xiaoxie_candidates.sort(key=lambda x: -x[0])  # 按行号降序
+        return xiaoxie_candidates[0][2]
+    
+    # 如果没有小写匹配，选择其他匹配中位置最靠后的
+    if other_candidates:
+        other_candidates.sort(key=lambda x: -x[0])
+        return other_candidates[0][2]
     
     return "0"
 
