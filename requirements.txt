@@ -1,0 +1,6 @@
+flask>=2.0.0
+paddlepaddle
+paddleocr>=2.6.0
+pymupdf
+Pillow
+werkzeug
